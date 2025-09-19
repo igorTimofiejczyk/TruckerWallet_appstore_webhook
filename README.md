@@ -8,6 +8,101 @@ A production-ready webhook handler for App Store Server Notifications v2 (iOS su
 - JWS verification with certificate chain validation
 - SQLite database with Prisma ORM
 - Idempotent notification processing
+- Support for all notification types (SUBSCRIBED, DID_RENEW, EXPIRED, etc.)
+- Sandbox and production environment support
+- Automatic database migrations
+- TypeScript for type safety
+- Comprehensive error handling
+- Health check endpoint
+- Documentation UI at root endpoint
+
+## Setup
+
+1. Clone the repository:
+   ```bash
+   git clone [your-repo-url]
+   cd appstore-webhook
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Configure environment:
+   ```bash
+   cp example.env .env
+   ```
+   Update the `.env` file with your settings:
+   - `BUNDLE_ID`: Your iOS app bundle identifier
+   - `APPLE_ENV`: `sandbox` for testing, `production` for live
+   - `DATABASE_URL`: SQLite database URL
+   - `PORT`: Server port (default: 3000)
+
+4. Set up the database:
+   ```bash
+   npm run prisma:generate
+   npm run prisma:migrate
+   ```
+
+## Development
+
+Run in development mode with hot reload:
+```bash
+npm run dev
+```
+
+## Production
+
+1. Build the project:
+   ```bash
+   npm run build
+   ```
+
+2. Start the server:
+   ```bash
+   npm start
+   ```
+
+## API Endpoints
+
+- `GET /`: Documentation and status page
+- `GET /health`: Health check endpoint
+- `POST /appstore-webhooks`: Main webhook endpoint for App Store notifications
+
+## Webhook Testing
+
+1. Start the server in sandbox mode (`APPLE_ENV=sandbox`)
+2. Ensure your server is accessible via HTTPS
+3. Configure the webhook URL in App Store Connect
+4. Test with sandbox subscriptions
+
+## Deployment
+
+This project includes Vercel configuration for easy deployment:
+
+1. Push your code to a Git repository
+2. Import the project in Vercel
+3. Configure environment variables
+4. Deploy
+
+For other platforms, ensure:
+- Node.js 18+ environment
+- HTTPS endpoint
+- Proper environment variables
+- Database access
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+MIT
 - Subscription status tracking
 - Ready for serverless deployment (Vercel)
 - Comprehensive logging
