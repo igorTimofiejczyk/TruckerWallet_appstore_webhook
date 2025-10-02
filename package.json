@@ -1,0 +1,13 @@
+{
+  "name": "truckerwallet-webhook-proxy",
+  "version": "1.0.0",
+  "description": "Apple App Store webhook proxy for TruckerWallet",
+  "main": "api/webhook.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'No build needed for serverless functions'"
+  },
+  "keywords": ["webhook", "apple", "appstore", "proxy"],
+  "author": "TruckerWallet",
+  "license": "MIT"
+}
