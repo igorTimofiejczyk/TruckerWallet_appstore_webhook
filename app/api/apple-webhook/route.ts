@@ -3,61 +3,52 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
-const APPWRITE_ENDPOINT = process.env.APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
+const APPWRITE_FUNCTION_URL = process.env.APPWRITE_FUNCTION_URL!;
 const APPWRITE_PROJECT_ID = process.env.APPWRITE_PROJECT_ID!;
 const APPWRITE_API_KEY = process.env.APPWRITE_API_KEY!;
-const APPWRITE_FUNCTION_ID = process.env.APPWRITE_FUNCTION_ID!;
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('📥 Incoming webhook (Vercel)');
+    // Получаем тело запроса как текст
+    const rawBody = await request.text();
 
-    const raw = await request.text();
-    console.log('🔹 Raw body from Apple:', raw);
+    // Логируем для дебага
+    console.log('📥 Incoming webhook request: ', request.method, request.url);
+    console.log('🔹 Raw request body:', rawBody);
 
-    // Forward to Appwrite: POST /v1/functions/{functionId}/executions
-    const appwriteUrl = `${APPWRITE_ENDPOINT}/functions/${APPWRITE_FUNCTION_ID}/executions`;
-
-    // Build request payload for Appwrite Cloud. Use "body" field (string),
-    // and set "path" to "/webhook" so context.req.path === "/webhook" in your function.
-    const appwritePayload = {
-      body: raw ?? '',
-      path: '/webhook',
-      method: 'POST',
-      // headers can be provided as an object (Appwrite expects a map)
-      headers: {
-        'content-type': 'application/json'
-      }
-    };
-
-    console.log('📦 Appwrite payload:', appwritePayload);
-
-    const resp = await fetch(appwriteUrl, {
+    // Пробрасываем в Appwrite Function
+    const appwriteResponse = await fetch(`${APPWRITE_FUNCTION_URL}/executions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Appwrite-Project': APPWRITE_PROJECT_ID,
         'X-Appwrite-Key': APPWRITE_API_KEY,
-        // optional: request a specific response format/version
-        'X-Appwrite-Response-Format': '1.8.0'
       },
-      body: JSON.stringify(appwritePayload)
+      // Appwrite ожидает строку в поле `data`
+      body: JSON.stringify({
+        data: rawBody,  // пробрасываем JSON как строку
+        path: '/webhook', // нужный endpoint в функции
+      }),
     });
 
-    const text = await resp.text();
-    console.log('📩 Appwrite response status:', resp.status);
-    console.log('📩 Appwrite response body:', text);
+    const responseText = await appwriteResponse.text();
+    console.log('📩 Appwrite raw response:', responseText);
 
-    // Return Appwrite response downstream (or you can mask/transform)
-    try {
-      const json = text ? JSON.parse(text) : null;
-      return NextResponse.json(json, { status: resp.status });
-    } catch {
-      return new NextResponse(text, { status: resp.status, headers: { 'Content-Type': 'application/json' }});
-    }
+    return new NextResponse(responseText, {
+      status: appwriteResponse.status,
+      headers: { 'Content-Type': 'application/json' },
+    });
 
-  } catch (err: any) {
-    console.error('❌ Proxy error:', err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+  } catch (error: any) {
+    console.error('❌ Vercel proxy error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
+
+export async function GET() {
+  return NextResponse.json({
+    status: 'ok',
+    service: 'Apple Webhook Proxy',
+    timestamp: new Date().toISOString(),
+  });
 }
