@@ -10,23 +10,32 @@ const APPWRITE_FUNCTION_ID = process.env.APPWRITE_FUNCTION_ID!;
 
 export async function POST(request: NextRequest) {
   try {
-    // Получаем тело как текст (Apple присылает JSON)
+    console.log('📥 Incoming webhook request:', request.method, request.url);
+
+    // Получаем тело запроса (Apple всегда шлёт JSON)
     const raw = await request.text();
+    console.log('🔹 Raw request body:', raw);
 
-    // Попытка распарсить JSON — если не JSON, оставляем пустой объект
+    // Парсим JSON
     let incoming: any = {};
-    try { incoming = raw ? JSON.parse(raw) : {}; } catch { incoming = {}; }
+    try {
+      incoming = raw ? JSON.parse(raw) : {};
+      console.log('✅ Parsed JSON body:', incoming);
+    } catch (err) {
+      console.warn('⚠️ Failed to parse JSON, using empty object');
+    }
 
-    // Формируем payload для Appwrite Function — добавляем endpoint для маршрутизации внутри функции
+    // Формируем payload для функции Appwrite
     const forwarded = { endpoint: 'webhook', ...incoming };
+    console.log('📤 Forwarded payload (to Appwrite Function):', forwarded);
 
-    // Формируем тело запроса для Appwrite Cloud executions endpoint
     const appwriteBody = {
       functionId: APPWRITE_FUNCTION_ID,
-      // important: data MUST be a string (serialized JSON)
       data: JSON.stringify(forwarded)
     };
+    console.log('📦 Appwrite request body:', appwriteBody);
 
+    // Отправляем в Appwrite
     const resp = await fetch(`${APPWRITE_ENDPOINT}/functions/executions`, {
       method: 'POST',
       headers: {
@@ -38,20 +47,25 @@ export async function POST(request: NextRequest) {
     });
 
     const text = await resp.text();
-    // Попытаемся вернуть JSON если это JSON
+    console.log('📩 Appwrite raw response:', text);
+
+    // Попробуем отдать JSON если это JSON
     try {
       const parsed = text ? JSON.parse(text) : null;
+      console.log('✅ Appwrite parsed response:', parsed);
       return NextResponse.json(parsed, { status: resp.status });
     } catch {
-      return new NextResponse(text, { status: resp.status, headers: { 'Content-Type': 'application/json' }});
+      console.log('⚠️ Appwrite response is not JSON, returning raw text');
+      return new NextResponse(text, { status: resp.status, headers: { 'Content-Type': 'application/json' } });
     }
 
   } catch (err: any) {
-    console.error('Proxy error:', err);
+    console.error('❌ Proxy error:', err);
     return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
   }
 }
 
 export async function GET() {
+  console.log('👋 Health check called');
   return NextResponse.json({ status: 'ok', service: 'TruckerWallet Webhook proxy', timestamp: new Date().toISOString() });
 }
