@@ -3,50 +3,55 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
-const APPWRITE_FUNCTION_URL = process.env.APPWRITE_FUNCTION_URL!;
+const APPWRITE_ENDPOINT = process.env.APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
 const APPWRITE_PROJECT_ID = process.env.APPWRITE_PROJECT_ID!;
+const APPWRITE_API_KEY = process.env.APPWRITE_API_KEY!;
+const APPWRITE_FUNCTION_ID = process.env.APPWRITE_FUNCTION_ID!;
 
 export async function POST(request: NextRequest) {
-  console.log('📱 Webhook received');
-
   try {
-    const body = await request.text();
-    
-    const pathname = request.nextUrl.pathname;
-    const endpoint = pathname.replace('/api/apple-webhook', '') || '/webhook';
+    // Получаем тело как текст (Apple присылает JSON)
+    const raw = await request.text();
 
-    const appwriteResponse = await fetch(
-      `${APPWRITE_FUNCTION_URL}${endpoint}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Appwrite-Project': APPWRITE_PROJECT_ID,
-        },
-        body: body,
-      }
-    );
+    // Попытка распарсить JSON — если не JSON, оставляем пустой объект
+    let incoming: any = {};
+    try { incoming = raw ? JSON.parse(raw) : {}; } catch { incoming = {}; }
 
-    const responseData = await appwriteResponse.text();
-    
-    return new NextResponse(responseData, {
-      status: appwriteResponse.status,
-      headers: { 'Content-Type': 'application/json' },
+    // Формируем payload для Appwrite Function — добавляем endpoint для маршрутизации внутри функции
+    const forwarded = { endpoint: 'webhook', ...incoming };
+
+    // Формируем тело запроса для Appwrite Cloud executions endpoint
+    const appwriteBody = {
+      functionId: APPWRITE_FUNCTION_ID,
+      // important: data MUST be a string (serialized JSON)
+      data: JSON.stringify(forwarded)
+    };
+
+    const resp = await fetch(`${APPWRITE_ENDPOINT}/functions/executions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Appwrite-Project': APPWRITE_PROJECT_ID,
+        'X-Appwrite-Key': APPWRITE_API_KEY
+      },
+      body: JSON.stringify(appwriteBody)
     });
 
-  } catch (error: any) {
-    console.error('❌ Error:', error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    );
+    const text = await resp.text();
+    // Попытаемся вернуть JSON если это JSON
+    try {
+      const parsed = text ? JSON.parse(text) : null;
+      return NextResponse.json(parsed, { status: resp.status });
+    } catch {
+      return new NextResponse(text, { status: resp.status, headers: { 'Content-Type': 'application/json' }});
+    }
+
+  } catch (err: any) {
+    console.error('Proxy error:', err);
+    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
   }
 }
 
 export async function GET() {
-  return NextResponse.json({
-    status: 'ok',
-    service: 'TruckerWallet Webhook',
-    timestamp: new Date().toISOString(),
-  });
+  return NextResponse.json({ status: 'ok', service: 'TruckerWallet Webhook proxy', timestamp: new Date().toISOString() });
 }
